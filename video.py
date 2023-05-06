@@ -6,6 +6,7 @@ Modified on Thu May 6 2023
 """
 # Yüklenecek olan kütüphaneler
 # pip install moviepy
+import importlib
 import os
 import re
 import traceback
@@ -16,6 +17,8 @@ from tkinter import ttk
 from tkinter import messagebox
 from tkinter import filedialog
 import threading
+
+import requests
 # Bu video regexi ile video urlsi kontrol edilecek ve doğruysa indirme işlemi başlayacak
 VideoUrlRegex = re.compile(r'^https://[a-z0-9.-]+\.edu\.tr/playback/presentation/[\d.]+/[-a-zA-Z0-9]+-\d+$') # Video Url Regex 
 
@@ -31,18 +34,43 @@ def download_files():
         # Butonu kilitle ve kullanıcıya işlemin başladığını göster
         download_button.configure(state="disabled")
         download_button.update()
-        
+        # linke strip uygula bu sayede sonundaki boşlukları sil ve linki tekrar ata
+        link = link.strip()
         # video ve ses dosya yollarının ayarlanması
         versiyon = "2.3/"
         url = link.replace("playback/", "").replace(versiyon, "")
         videoUrl = url + "/deskshare/deskshare.mp4"
         sesUrl = url + "/video/webcams.mp4"
+        print(videoUrl)
+        print(sesUrl)
+        
         # Dosyaların indirilmesi ve kaydedilmesi
-        urllib.request.urlretrieve(videoUrl, "video.mp4", report_hook)
+        with requests.get(videoUrl, stream=True, verify=False) as r:
+            r.raise_for_status()
+            with open("video.mp4", "wb") as f:
+                total_size = int(r.headers.get('content-length', 0))
+                count = 0
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
+                    count += len(chunk)
+                    
+                    report_hook(count, len(chunk), total_size)
+                    
         print("Video İndirildi")
         # Dosyaların indirilmesi ve kaydedilmesi
-        urllib.request.urlretrieve(sesUrl, "ses.mp4", report_hook)
-        print("Ses Dosyası İndirildi")
+        with requests.get(sesUrl, stream=True, verify=False) as r:
+            r.raise_for_status()
+            with open("ses.mp4", "wb") as f:
+                total_size = int(r.headers.get('content-length', 0))
+                count = 0
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
+                    count += len(chunk)
+        # urllib.request.urlretrieve(videoUrl, "video.mp4", report_hook)
+        # print("Video İndirildi")
+        # # Dosyaların indirilmesi ve kaydedilmesi
+        # urllib.request.urlretrieve(sesUrl, "ses.mp4", report_hook)
+        # print("Ses Dosyası İndirildi")
 
         messagebox.showinfo("Download Completed", "Dosyalar Başarıyla İndirildi")
 
@@ -109,11 +137,15 @@ def write_file(video_file: VideoClip, save_file_path: str, video, ses):
     
 
 def report_hook(count, block_size, total_size):
-    progress = int(count * block_size * 100 / total_size)
+    progress = int(count / total_size * 100)
     progress_bar["value"] = progress
     root.update_idletasks()
 
-
+if '_PYIBoot_SPLASH' in os.environ and importlib.util.find_spec("pyi_splash"):
+    import pyi_splash
+    pyi_splash.update_text('Arayüz Oluşturuluyor')
+    pyi_splash.close()
+    print("Splash Closed")
 # Arayüzün oluşturulması ve ayarlanması
 root = tk.Tk()  # Arayüzün oluşturulması
 root.title("Video İndirici")  # Arayüzün başlığı
